@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 # LangChain components for loading text, chunking, embedding, and LLM communication
 from langchain_community.document_loaders import TextLoader
-from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.vectorstores import Chroma
@@ -39,8 +39,8 @@ class EnterpriseRAG:
         print("[RAG ENGINE] Initializing Enterprise LLM System...")
         
         # 1. INITIALIZE MODELS
-        # We use a purely local 'FastEmbed' model for vectors (0 network errors) and 'gemini-flash-latest' for chat.
-        self.embeddings = FastEmbedEmbeddings()
+        # We use Google's cloud embeddings so we don't crash Render's tiny CPU.
+        self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         self.llm = ChatGoogleGenerativeAI(model="gemini-flash-latest", temperature=0)
 
         # 2. LOAD & CHUNK DATA
