@@ -73,11 +73,10 @@ async def chat_with_hr_bot(request: ChatRequest):
     The core API endpoint. 
     Frontend sends a POST request with JSON: { "question": "How many PTO days do I get?" }
     """
-    # 1. Safety check: Did the AI engine load correctly? (Did they forget the API key?)
     if not rag_system:
         raise HTTPException(
             status_code=500, 
-            detail="AI Engine is offline. Check your GOOGLE_API_KEY in the .env file."
+            detail="AI Engine is offline. Check your GROQ_API_KEY in the .env file or Render Environment."
         )
     
     try:

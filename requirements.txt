@@ -1,8 +1,8 @@
 fastapi
 uvicorn
 langchain
+langchain-groq
 langchain-community
-langchain-google-genai
-fastembed
 chromadb
+fastembed
 python-dotenv

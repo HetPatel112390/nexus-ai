@@ -17,18 +17,20 @@ from dotenv import load_dotenv
 
 # LangChain components for loading text, chunking, embedding, and LLM communication
 from langchain_community.document_loaders import TextLoader
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.vectorstores import Chroma
 from langchain_core.prompts import PromptTemplate
+
+# New Super-Fast Free Models
+from langchain_groq import ChatGroq
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 
 # Load environment variables (API keys) from our .env file
 load_dotenv()
 
-# We need an API key to talk to OpenAI's models. If it's missing, crash early to warn the developer.
-if not os.environ.get("GOOGLE_API_KEY"):
-    raise ValueError("CRITICAL ERROR: GOOGLE_API_KEY not found in .env file. Please add it.")
+# We need an API key to talk to Groq's supercomputers. If it's missing, crash early to warn the developer.
+if not os.environ.get("GROQ_API_KEY"):
+    raise ValueError("CRITICAL ERROR: GROQ_API_KEY not found in .env file. Please add it.")
 
 class EnterpriseRAG:
     def __init__(self, data_path="./data/company_policy.txt"):
@@ -39,26 +41,24 @@ class EnterpriseRAG:
         print("[RAG ENGINE] Initializing Enterprise LLM System...")
         
         # 1. INITIALIZE MODELS
-        # We use Google's cloud embeddings so we don't crash Render's tiny CPU.
-        google_api_key = os.environ.get("GOOGLE_API_KEY")
-        self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
-        self.llm = ChatGoogleGenerativeAI(model="gemini-flash-latest", temperature=0, google_api_key=google_api_key)
+        # We use Groq's lightning fast Llama-3 model
+        groq_api_key = os.environ.get("GROQ_API_KEY")
+        self.llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0, groq_api_key=groq_api_key)
 
         # 2. LOAD & CHUNK DATA
         # Read the text file containing our private company data.
         loader = TextLoader(data_path)
         raw_documents = loader.load()
 
-        # LLMs have a "context window" limit (they can't read a 10,000-page book in one go).
-        # We split our document into chunks of 500 characters. 
-        # chunk_overlap=50 ensures that if a sentence gets cut in half, the context isn't lost.
+        # LLMs have a "context window" limit. We split our document into chunks of 500 characters. 
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         chunks = text_splitter.split_documents(raw_documents)
         print(f"[RAG ENGINE] Split document into {len(chunks)} chunks.")
 
         # 3. CREATE VECTOR DATABASE (ChromaDB)
-        # We take our text chunks, turn them into vectors via OpenAIEmbeddings, 
-        # and store them in an in-memory Chroma database.
+        # We use FastEmbed because it runs locally for free without needing any API keys
+        print("[RAG ENGINE] Embedding data with ultra-fast local FastEmbed...")
+        self.embeddings = FastEmbedEmbeddings()
         self.vector_db = Chroma.from_documents(documents=chunks, embedding=self.embeddings)
 
         # A "Retriever" is a tool that takes a user query, turns it into a vector, 
@@ -83,8 +83,6 @@ class EnterpriseRAG:
     async def ask_question(self, user_question: str) -> dict:
         """
         Public method to query the RAG system asynchronously.
-        This ensures the web server never blocks while waiting for the AI to respond,
-        allowing for thousands of simultaneous users.
         """
         # 1. Ask the Vector Database to find the most relevant chunks of text (using async)
         retrieved_docs = await self.retriever.ainvoke(user_question)
