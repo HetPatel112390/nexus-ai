@@ -40,8 +40,9 @@ class EnterpriseRAG:
         
         # 1. INITIALIZE MODELS
         # We use Google's cloud embeddings so we don't crash Render's tiny CPU.
-        self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        self.llm = ChatGoogleGenerativeAI(model="gemini-flash-latest", temperature=0)
+        google_api_key = os.environ.get("GOOGLE_API_KEY")
+        self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
+        self.llm = ChatGoogleGenerativeAI(model="gemini-flash-latest", temperature=0, google_api_key=google_api_key)
 
         # 2. LOAD & CHUNK DATA
         # Read the text file containing our private company data.

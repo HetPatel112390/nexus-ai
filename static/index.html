@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Nexus AI">
-    <meta name="theme-color" content="#050505">
+    <meta name="theme-color" content="#0f111a">
     <!-- End iOS Meta Tags -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -34,10 +34,10 @@
             background-color: var(--bg-dark);
             color: var(--text-main);
             height: 100vh;
-            height: 100dvh; /* Mobile browser fix */
+            height: 100dvh;
             display: flex;
             flex-direction: column;
-            align-items: center; /* Horizontally centers everything */
+            align-items: center;
             overflow: hidden;
             position: relative;
         }
@@ -65,6 +65,14 @@
             position: fixed;
             top: 0;
             left: 0;
+            transition: opacity 0.5s;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .header.chat-active {
+            opacity: 1;
+            pointer-events: auto;
         }
 
         .header h1 {
@@ -75,21 +83,26 @@
             color: #fff;
         }
 
-        /* MAIN CHAT COLUMN - PERFECTLY CENTERED */
+        /* MAIN CHAT COLUMN */
         .chat-history {
             width: 100%;
-            max-width: 800px; /* Limits width on PC, takes 100% on mobile */
+            max-width: 800px;
             height: 100%;
-            padding: 80px 1rem 140px 1rem; /* Space for fixed header and bottom input */
+            padding: 80px 1rem 140px 1rem;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
             scroll-behavior: smooth;
             z-index: 10;
+            opacity: 0;
+            transition: opacity 0.5s;
         }
 
-        /* Hides scrollbar for ultra-clean look */
+        .chat-history.chat-active {
+            opacity: 1;
+        }
+
         .chat-history::-webkit-scrollbar { width: 0px; background: transparent; }
 
         .message {
@@ -104,13 +117,8 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .message.user {
-            align-items: flex-end;
-        }
-
-        .message.ai {
-            align-items: flex-start;
-        }
+        .message.user { align-items: flex-end; }
+        .message.ai { align-items: flex-start; }
 
         .bubble {
             max-width: 90%;
@@ -166,25 +174,62 @@
             font-weight: 500;
         }
 
-        /* PERFECTLY CENTERED INPUT AREA */
-        .input-area {
-            position: fixed;
-            bottom: 0;
-            left: 0;
+        /* HERO TITLE */
+        .hero-title {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 5;
+            transition: all 0.5s ease;
             width: 100%;
-            padding: 1rem;
-            padding-bottom: max(1rem, env(safe-area-inset-bottom)); /* iPhone notch safe area */
-            background: linear-gradient(to top, var(--bg-dark) 80%, transparent);
-            display: flex;
-            justify-content: center; /* Forces the box to the exact center of the screen */
-            align-items: center;
-            z-index: 30;
+        }
+        .hero-title h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero-title p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+        .hero-title.chat-active {
+            opacity: 0;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
         }
 
-        /* THE CHATBOX ITSELF */
+        /* DYNAMIC INPUT AREA */
+        .input-area {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .input-area.chat-active {
+            top: auto;
+            bottom: 0;
+            left: 0;
+            transform: none;
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+            background: linear-gradient(to top, var(--bg-dark) 80%, transparent);
+        }
+
         .input-wrapper {
             width: 100%;
-            max-width: 800px; /* Same max-width as chat history */
+            max-width: 800px;
             display: flex;
             align-items: flex-end;
             background: rgba(30, 33, 48, 0.95);
@@ -197,9 +242,7 @@
             transition: border-color 0.3s;
         }
 
-        .input-wrapper:focus-within {
-            border-color: var(--accent);
-        }
+        .input-wrapper:focus-within { border-color: var(--accent); }
 
         textarea {
             flex: 1;
@@ -207,17 +250,15 @@
             border: none;
             color: white;
             padding: 0.75rem 0;
-            font-size: 16px; /* 16px prevents mobile keyboard zoom */
+            font-size: 16px;
             line-height: 1.5;
             outline: none;
             resize: none;
-            height: 48px; /* Fixed starting height */
+            height: 48px;
             max-height: 150px;
         }
 
-        textarea::placeholder {
-            color: rgba(255, 255, 255, 0.4);
-        }
+        textarea::placeholder { color: rgba(255, 255, 255, 0.4); }
 
         button {
             background: #fff;
@@ -231,14 +272,11 @@
             align-items: center;
             justify-content: center;
             margin-left: 10px;
-            flex-shrink: 0; /* Prevents button from squishing */
+            flex-shrink: 0;
         }
 
-        button:active {
-            transform: scale(0.9);
-        }
+        button:active { transform: scale(0.9); }
 
-        /* TYPING INDICATOR */
         .typing-indicator {
             display: none;
             gap: 6px;
@@ -257,178 +295,131 @@
     </style>
 </head>
 <body>
-
-    <!-- ADVANCED ANIMATED BACKGROUND -->
-    <div class="bg-grid"></div>
     <div id="glow"></div>
+    
+    <div class="hero-title" id="heroTitle">
+        <h1>NEXUS AI</h1>
+        <p>Ask anything about your enterprise data.</p>
+    </div>
 
-    <!-- MAIN CHAT INTERFACE -->
-    <div class="container">
-        
-        <div class="header">
-            <h1>NEXUS AI</h1>
-        </div>
+    <div class="header" id="appHeader">
+        <h1>NEXUS AI</h1>
+    </div>
 
-        <div class="chat-history" id="chatHistory">
-            <div class="message ai">
-                <span class="label">Nexus AI</span>
-                <div class="bubble">System Online. Connected to Enterprise Knowledge Base.<br><br>I am designed for ultra-fast, high-precision answers. Ask me anything about your documents or data.</div>
-            </div>
-        </div>
+    <div class="chat-history" id="chatHistory">
+        <!-- Messages will appear here -->
+    </div>
 
-        <div class="typing-indicator" id="typingIndicator">
-            <div class="dot"></div>
-            <div class="dot"></div>
-            <div class="dot"></div>
-        </div>
-
-        <div class="input-area">
-            <div class="input-wrapper">
-                <textarea id="questionInput" placeholder="Message Nexus AI... (Shift+Enter for new line)" autocomplete="off"></textarea>
-                <button id="sendBtn">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                </button>
-            </div>
+    <div class="input-area" id="inputArea">
+        <div class="input-wrapper">
+            <textarea 
+                id="userInput" 
+                placeholder="Message Nexus AI..." 
+                rows="1"
+                oninput="this.style.height = '';this.style.height = Math.min(this.scrollHeight, 150) + 'px'"
+            ></textarea>
+            <button id="sendBtn" onclick="sendMessage()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
         </div>
     </div>
 
     <script>
-        // --- 1. LIVE WALLPAPER (MOUSE TRACKING GLOW) ---
-        const glow = document.getElementById('glow');
-        let mouseX = window.innerWidth / 2;
-        let mouseY = window.innerHeight / 2;
-        
-        // Follow cursor
-        document.addEventListener('mousemove', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-        });
+        const inputField = document.getElementById("userInput");
+        const chatHistory = document.getElementById("chatHistory");
+        const sendBtn = document.getElementById("sendBtn");
+        let isFirstMessage = true;
 
-        // Smooth animation loop for the glow
-        let currentX = mouseX;
-        let currentY = mouseY;
-        
-        function animateGlow() {
-            currentX += (mouseX - currentX) * 0.05;
-            currentY += (mouseY - currentY) * 0.05;
-            glow.style.left = currentX + 'px';
-            glow.style.top = currentY + 'px';
-            requestAnimationFrame(animateGlow);
-        }
-        animateGlow();
-
-        // Pulsate effect on click
-        document.addEventListener('mousedown', () => {
-            glow.style.width = '700px';
-            glow.style.height = '700px';
-        });
-        document.addEventListener('mouseup', () => {
-            glow.style.width = '600px';
-            glow.style.height = '600px';
-        });
-
-
-        // --- 2. CHAT LOGIC ---
-        const chatHistory = document.getElementById('chatHistory');
-        const questionInput = document.getElementById('questionInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const typingIndicator = document.getElementById('typingIndicator');
-
-        questionInput.addEventListener('keydown', function (e) {
-            // Send on Enter (but allow Shift+Enter for new lines)
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
+        inputField.addEventListener("keydown", function(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
                 sendMessage();
             }
         });
 
-        sendBtn.addEventListener('click', sendMessage);
-
-        function addMessage(text, sender) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message ${sender}`;
+        async function sendMessage() {
+            const text = inputField.value.trim();
+            if (!text) return;
             
-            const label = document.createElement('span');
-            label.className = 'label';
-            label.innerText = sender === 'user' ? 'You' : 'Nexus AI';
-            
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-            
-            // If it's the AI, parse markdown. If user, just show text.
-            if (sender === 'ai') {
-                bubble.innerHTML = marked.parse(text);
-            } else {
-                bubble.innerText = text;
+            // Trigger the animation to move the search bar to the bottom
+            if (isFirstMessage) {
+                document.getElementById('inputArea').classList.add('chat-active');
+                document.getElementById('chatHistory').classList.add('chat-active');
+                document.getElementById('appHeader').classList.add('chat-active');
+                document.getElementById('heroTitle').classList.add('chat-active');
+                isFirstMessage = false;
             }
 
-            msgDiv.appendChild(label);
-            msgDiv.appendChild(bubble);
-            chatHistory.appendChild(msgDiv);
+            inputField.value = "";
+            inputField.style.height = "48px";
+            appendMessage("You", text, "user");
+
+            const aiMessageDiv = appendMessage("Nexus AI", "", "ai");
+            const bubble = aiMessageDiv.querySelector(".bubble");
             
+            bubble.innerHTML = `
+                <div class="typing-indicator" style="display: flex;">
+                    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                </div>
+            `;
             chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            try {
+                const url = `/api/stream?question=${encodeURIComponent(text)}`;
+                const source = new EventSource(url);
+                let fullResponse = "";
+                let isFirstToken = true;
+
+                source.onmessage = function(event) {
+                    if (event.data === "[DONE]") {
+                        source.close();
+                        bubble.innerHTML = marked.parse(fullResponse);
+                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                        return;
+                    }
+                    if (event.data.startsWith("[ERROR]")) {
+                        source.close();
+                        bubble.innerHTML = "<strong style='color:#ef4444'>Network Error:</strong> " + event.data.replace("[ERROR]", "");
+                        return;
+                    }
+
+                    if (isFirstToken) {
+                        bubble.innerHTML = "";
+                        isFirstToken = false;
+                    }
+
+                    const token = event.data.replace(/<br>/g, '\n');
+                    fullResponse += token;
+                    bubble.innerHTML = marked.parse(fullResponse);
+                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                };
+
+                source.onerror = function(err) {
+                    source.close();
+                    bubble.innerHTML = "<strong style='color:#ef4444'>Network Error:</strong> Could not connect to the stream. Check backend logs.";
+                };
+
+            } catch (error) {
+                bubble.innerHTML = "<strong style='color:#ef4444'>Error:</strong> " + error.message;
+            }
         }
 
-        async function sendMessage() {
-            const question = questionInput.value.trim();
-            if (!question) return;
-
-            addMessage(question, 'user');
-            questionInput.value = '';
+        function appendMessage(sender, text, type) {
+            const msgDiv = document.createElement("div");
+            msgDiv.className = `message ${type}`;
             
-            typingIndicator.style.display = 'flex';
+            let parsedText = marked.parse(text || "");
+            
+            msgDiv.innerHTML = `
+                <div class="label">${sender}</div>
+                <div class="bubble">${parsedText}</div>
+            `;
+            chatHistory.appendChild(msgDiv);
             chatHistory.scrollTop = chatHistory.scrollHeight;
-
-            // Prepare the AI message bubble
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message ai`;
-            
-            const label = document.createElement('span');
-            label.className = 'label';
-            label.innerText = 'Nexus AI';
-            
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-            bubble.innerHTML = ''; // Start empty for streaming
-
-            msgDiv.appendChild(label);
-            msgDiv.appendChild(bubble);
-
-            // Create EventSource for Streaming (SSE)
-            const encodedQuestion = encodeURIComponent(question);
-            const source = new EventSource(`/api/stream?question=${encodedQuestion}`);
-
-            let fullText = ""; // Accumulate text for markdown parsing
-
-            source.onmessage = function(event) {
-                if (typingIndicator.style.display !== 'none') {
-                    typingIndicator.style.display = 'none';
-                    chatHistory.appendChild(msgDiv);
-                }
-
-                if (event.data === "[DONE]") {
-                    source.close();
-                } else if (event.data.startsWith("[ERROR]")) {
-                    fullText += "\n\n*Error: " + event.data + "*";
-                    bubble.innerHTML = marked.parse(fullText);
-                    source.close();
-                } else {
-                    // Python sends <br> instead of \n to preserve SSE formatting.
-                    // Replace <br> back to \n so marked.js can parse bold text and code blocks properly!
-                    let chunk = event.data.replace(/<br>/g, '\n');
-                    fullText += chunk;
-                    bubble.innerHTML = marked.parse(fullText);
-                    chatHistory.scrollTop = chatHistory.scrollHeight;
-                }
-            };
-
-            source.onerror = function(error) {
-                source.close();
-                typingIndicator.style.display = 'none';
-                if (bubble.innerHTML === '') {
-                    addMessage("Network Error: Could not connect to the stream.", 'ai');
-                }
-            };
+            return msgDiv;
         }
     </script>
 </body>
