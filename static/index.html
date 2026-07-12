@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus AI</title>
+    <!-- iOS Native App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Nexus AI">
+    <meta name="theme-color" content="#050505">
+    <!-- End iOS Meta Tags -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #050505;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* LIVE WALLPAPER / GLOWING CURSOR EFFECT */
+        #glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 50%, rgba(0, 0, 0, 0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            transition: width 0.3s, height 0.3s;
+            filter: blur(40px);
+        }
+
+        /* GRID BACKGROUND */
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 1;
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+            -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+        }
+
+        /* CHAT CONTAINER (GLASSMORPHISM) */
+        .container {
+            width: 95%;
+            max-width: 1200px;
+            height: 90vh;
+            height: 90dvh;
+            display: flex;
+            flex-direction: column;
+            background: rgba(10, 10, 15, 0.6);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-radius: 30px;
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.2), inset 0 0 20px rgba(255,255,255,0.05);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            z-index: 10;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* FUTURISTIC PULSING BORDER */
+        .container::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #3b82f6);
+            background-size: 200% 100%;
+            z-index: -1;
+            border-radius: 32px;
+            animation: borderGlow 4s linear infinite;
+            opacity: 0.5;
+        }
+
+        @keyframes borderGlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+
+        /* HEADER */
+        .header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            background: linear-gradient(to right, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* CHAT HISTORY */
+        .chat-history {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            scroll-behavior: smooth;
+        }
+
+        .chat-history::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-history::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 80%;
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        @keyframes slideUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            align-self: flex-end;
+        }
+
+        .message.ai {
+            align-self: flex-start;
+        }
+
+        .bubble {
+            padding: 1rem 1.25rem;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .message.user .bubble {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.ai .bubble {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* MARKDOWN STYLING INSIDE BUBBLES */
+        .bubble p { margin-bottom: 0.75rem; }
+        .bubble p:last-child { margin-bottom: 0; }
+        .bubble strong { font-weight: 700; color: #fff; }
+        .bubble h1, .bubble h2, .bubble h3 { margin-bottom: 0.75rem; margin-top: 1rem; color: #fff; }
+        .bubble h1:first-child, .bubble h2:first-child, .bubble h3:first-child { margin-top: 0; }
+        .bubble ul, .bubble ol { margin-left: 1.5rem; margin-bottom: 0.75rem; }
+        .bubble li { margin-bottom: 0.25rem; }
+        
+        /* Table Overflow Fixes */
+        .bubble table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 0.5rem;
+            margin-bottom: 0.75rem; 
+            display: block; 
+            overflow-x: auto; 
+            white-space: nowrap; /* Prevents text from squishing on mobile */
+        }
+        .bubble th, .bubble td { 
+            border: 1px solid rgba(255,255,255,0.15); 
+            padding: 0.6rem; 
+        }
+        .bubble th { background: rgba(255,255,255,0.05); color: #fff; }
+
+        .bubble pre { 
+            background: rgba(0,0,0,0.4); 
+            padding: 1rem; 
+            border-radius: 8px; 
+            overflow-x: auto; 
+            margin-top: 0.5rem;
+            margin-bottom: 0.75rem; 
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .bubble code { 
+            font-family: 'Courier New', Courier, monospace; 
+            background: rgba(0,0,0,0.3); 
+            padding: 0.2rem 0.4rem; 
+            border-radius: 4px; 
+            color: #60a5fa;
+        }
+        .bubble pre code {
+            background: transparent;
+            padding: 0;
+            color: #e2e8f0;
+        }
+
+        .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 0.4rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        .message.user .label {
+            align-self: flex-end;
+        }
+
+        /* INPUT AREA (CLAUDE STYLE) */
+        .input-area {
+            padding: 2rem;
+            background: transparent;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 1.5rem;
+            position: relative;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 24px;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: inset 0 4px 20px rgba(0,0,0,0.5), 0 0 20px rgba(59, 130, 246, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: rgba(139, 92, 246, 0.6);
+            box-shadow: inset 0 4px 20px rgba(0,0,0,0.5), 0 0 40px rgba(139, 92, 246, 0.2);
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            font-size: 1.1rem;
+            line-height: 1.5;
+            outline: none;
+            resize: none;
+            height: 80px;
+        }
+
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        button {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            align-self: flex-end;
+            margin-bottom: 0.5rem;
+            margin-right: 0.5rem;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255,255,255,0.1);
+        }
+
+        button:active {
+            transform: translateY(0) scale(0.96);
+        }
+
+        /* LOADING ANIMATION */
+        .typing-indicator {
+            display: none;
+            gap: 6px;
+            padding: 1.25rem 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            align-self: flex-start;
+            margin-top: -0.5rem;
+            animation: slideUp 0.3s ease forwards;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* MOBILE RESPONSIVENESS */
+        @media (max-width: 768px) {
+            body {
+                align-items: flex-start;
+            }
+            .container {
+                width: 100%;
+                height: 100vh;
+                height: 100dvh;
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+            .container::before {
+                display: none; /* Remove neon border on mobile to save battery/space */
+            }
+            .header {
+                padding: 1rem;
+            }
+            .chat-history {
+                padding: 1rem;
+            }
+            .message {
+                max-width: 95%;
+            }
+            .input-area {
+                padding: 0.75rem;
+                padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+                background: var(--bg-dark); /* Ensure no transparency issues on mobile keyboard */
+            }
+            .input-wrapper {
+                padding: 0.5rem;
+                gap: 0.5rem;
+                flex-direction: row; /* Keep button next to input */
+                align-items: flex-end;
+            }
+            textarea {
+                height: 45px;
+                padding: 0.5rem;
+                font-size: 1rem; /* Prevent iOS zoom */
+            }
+            button {
+                width: 45px;
+                height: 45px;
+                margin: 0;
+                border-radius: 12px;
+            }
+            #glow {
+                display: block; /* Bring back the glow for mobile */
+                animation: mobilePulse 4s infinite alternate;
+                left: 50% !important;
+                top: 50% !important;
+                width: 400px !important;
+                height: 400px !important;
+            }
+            @keyframes mobilePulse {
+                0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.5; }
+                100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ADVANCED ANIMATED BACKGROUND -->
+    <div class="bg-grid"></div>
+    <div id="glow"></div>
+
+    <!-- MAIN CHAT INTERFACE -->
+    <div class="container">
+        
+        <div class="header">
+            <h1>NEXUS AI</h1>
+        </div>
+
+        <div class="chat-history" id="chatHistory">
+            <div class="message ai">
+                <span class="label">Nexus AI</span>
+                <div class="bubble">System Online. Connected to Enterprise Knowledge Base.<br><br>I am designed for ultra-fast, high-precision answers. Ask me anything about your documents or data.</div>
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea id="questionInput" placeholder="Message Nexus AI... (Shift+Enter for new line)" autocomplete="off"></textarea>
+                <button id="sendBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. LIVE WALLPAPER (MOUSE TRACKING GLOW) ---
+        const glow = document.getElementById('glow');
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        
+        // Follow cursor
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Smooth animation loop for the glow
+        let currentX = mouseX;
+        let currentY = mouseY;
+        
+        function animateGlow() {
+            currentX += (mouseX - currentX) * 0.05;
+            currentY += (mouseY - currentY) * 0.05;
+            glow.style.left = currentX + 'px';
+            glow.style.top = currentY + 'px';
+            requestAnimationFrame(animateGlow);
+        }
+        animateGlow();
+
+        // Pulsate effect on click
+        document.addEventListener('mousedown', () => {
+            glow.style.width = '700px';
+            glow.style.height = '700px';
+        });
+        document.addEventListener('mouseup', () => {
+            glow.style.width = '600px';
+            glow.style.height = '600px';
+        });
+
+
+        // --- 2. CHAT LOGIC ---
+        const chatHistory = document.getElementById('chatHistory');
+        const questionInput = document.getElementById('questionInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        questionInput.addEventListener('keydown', function (e) {
+            // Send on Enter (but allow Shift+Enter for new lines)
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendBtn.addEventListener('click', sendMessage);
+
+        function addMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender}`;
+            
+            const label = document.createElement('span');
+            label.className = 'label';
+            label.innerText = sender === 'user' ? 'You' : 'Nexus AI';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            
+            // If it's the AI, parse markdown. If user, just show text.
+            if (sender === 'ai') {
+                bubble.innerHTML = marked.parse(text);
+            } else {
+                bubble.innerText = text;
+            }
+
+            msgDiv.appendChild(label);
+            msgDiv.appendChild(bubble);
+            chatHistory.appendChild(msgDiv);
+            
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            addMessage(question, 'user');
+            questionInput.value = '';
+            
+            typingIndicator.style.display = 'flex';
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            // Prepare the AI message bubble
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ai`;
+            
+            const label = document.createElement('span');
+            label.className = 'label';
+            label.innerText = 'Nexus AI';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerHTML = ''; // Start empty for streaming
+
+            msgDiv.appendChild(label);
+            msgDiv.appendChild(bubble);
+
+            // Create EventSource for Streaming (SSE)
+            const encodedQuestion = encodeURIComponent(question);
+            const source = new EventSource(`/api/stream?question=${encodedQuestion}`);
+
+            let fullText = ""; // Accumulate text for markdown parsing
+
+            source.onmessage = function(event) {
+                if (typingIndicator.style.display !== 'none') {
+                    typingIndicator.style.display = 'none';
+                    chatHistory.appendChild(msgDiv);
+                }
+
+                if (event.data === "[DONE]") {
+                    source.close();
+                } else if (event.data.startsWith("[ERROR]")) {
+                    fullText += "\n\n*Error: " + event.data + "*";
+                    bubble.innerHTML = marked.parse(fullText);
+                    source.close();
+                } else {
+                    // Python sends <br> instead of \n to preserve SSE formatting.
+                    // Replace <br> back to \n so marked.js can parse bold text and code blocks properly!
+                    let chunk = event.data.replace(/<br>/g, '\n');
+                    fullText += chunk;
+                    bubble.innerHTML = marked.parse(fullText);
+                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                }
+            };
+
+            source.onerror = function(error) {
+                source.close();
+                typingIndicator.style.display = 'none';
+                if (bubble.innerHTML === '') {
+                    addMessage("Network Error: Could not connect to the stream.", 'ai');
+                }
+            };
+        }
+    </script>
+</body>
+</html>
