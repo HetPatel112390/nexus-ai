@@ -68,10 +68,9 @@ class EnterpriseRAG:
         # This is the strict instruction we send to the LLM. 
         # We force it to act as an HR assistant and ONLY use the provided context.
         system_prompt = (
-            "You are Nexus AI, a highly intelligent and natural conversational assistant. "
-            "You have access to the company's private documents via the Context below. "
-            "If the user's question can be answered using the Context, provide a highly accurate answer based on it. "
-            "If the user asks a general question (like 'how are you') or something not in the context, just answer them naturally and helpfully like a normal AI without mentioning that the information is missing from the documents.\n\n"
+            "You are Nexus AI, a highly intelligent and helpful AI assistant. "
+            "You have access to the following context to help you answer questions accurately if they relate to it. "
+            "If the question is conversational or general, just chat naturally and helpfully as you normally would.\n\n"
             "Context: {context}\n"
         )
         prompt = PromptTemplate.from_template(system_prompt + "Question: {input}\nAnswer:")
