@@ -15,29 +15,29 @@
     <style>
         :root {
             --bg-dark: #0f111a;
-            --bg-surface: #1a1d2d;
+            --bg-surface: #1e2136;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             --accent: #6366f1;
-            --accent-glow: rgba(99, 102, 241, 0.5);
-            --border: rgba(255, 255, 255, 0.08);
+            --border: rgba(255, 255, 255, 0.1);
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             background-color: var(--bg-dark);
             color: var(--text-main);
             height: 100vh;
-            height: 100dvh;
+            height: 100dvh; /* Mobile browser fix */
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: center; /* Horizontally centers everything */
             overflow: hidden;
             position: relative;
         }
@@ -45,87 +45,62 @@
         /* LIVE WALLPAPER BACKGROUND */
         #glow {
             position: absolute;
-            width: 800px;
-            height: 800px;
-            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 40%, rgba(0, 0, 0, 0) 70%);
-            border-radius: 50%;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.08) 0%, rgba(0, 0, 0, 0) 50%);
             z-index: 0;
-            filter: blur(50px);
-            left: 50%;
-            top: 50%;
-            animation: pulseGlow 8s infinite alternate;
-        }
-
-        @keyframes pulseGlow {
-            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.5; }
-            100% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
-        }
-
-        /* MAIN CHAT COLUMN (SAME FOR MOBILE AND DESKTOP) */
-        .container {
-            width: 100%;
-            max-width: 850px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            z-index: 10;
-            background: transparent;
+            pointer-events: none;
         }
 
         /* HEADER */
         .header {
+            width: 100%;
             padding: 1.5rem;
             text-align: center;
+            border-bottom: 1px solid var(--border);
+            background: rgba(15, 17, 26, 0.9);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border);
-            background: rgba(15, 17, 26, 0.8);
             z-index: 20;
+            position: fixed;
+            top: 0;
+            left: 0;
         }
 
         .header h1 {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.15em;
             text-transform: uppercase;
-            background: linear-gradient(135deg, #818cf8, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #fff;
         }
 
-        /* CHAT HISTORY */
+        /* MAIN CHAT COLUMN - PERFECTLY CENTERED */
         .chat-history {
-            flex: 1;
-            padding: 2rem 1.5rem 120px 1.5rem; /* Extra padding at bottom for input */
+            width: 100%;
+            max-width: 800px; /* Limits width on PC, takes 100% on mobile */
+            height: 100%;
+            padding: 80px 1rem 140px 1rem; /* Space for fixed header and bottom input */
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 2rem;
+            gap: 1.5rem;
             scroll-behavior: smooth;
-            width: 100%;
+            z-index: 10;
         }
 
-        .chat-history::-webkit-scrollbar {
-            width: 4px;
-        }
-        .chat-history::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 10px;
-        }
+        /* Hides scrollbar for ultra-clean look */
+        .chat-history::-webkit-scrollbar { width: 0px; background: transparent; }
 
         .message {
             display: flex;
             flex-direction: column;
             width: 100%;
-            animation: fadeUp 0.5s ease forwards;
-            opacity: 0;
-            transform: translateY(15px);
+            animation: fadeUp 0.4s ease forwards;
         }
 
         @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
@@ -138,24 +113,25 @@
         }
 
         .bubble {
-            max-width: 85%;
+            max-width: 90%;
             padding: 1rem 1.25rem;
-            border-radius: 20px;
-            font-size: 0.95rem;
+            border-radius: 24px;
+            font-size: 1rem;
             line-height: 1.6;
+            word-wrap: break-word;
         }
 
         .message.user .bubble {
             background: var(--bg-surface);
-            color: var(--text-main);
+            color: #fff;
             border: 1px solid var(--border);
-            border-bottom-right-radius: 4px;
+            border-bottom-right-radius: 6px;
         }
 
         .message.ai .bubble {
             background: transparent;
             color: var(--text-main);
-            padding: 0; /* Clean look for AI */
+            padding: 0; 
             max-width: 100%;
         }
 
@@ -163,73 +139,66 @@
         .bubble p { margin-bottom: 1rem; }
         .bubble p:last-child { margin-bottom: 0; }
         .bubble strong { font-weight: 600; color: #fff; }
-        .bubble h1, .bubble h2, .bubble h3 { margin-bottom: 1rem; margin-top: 1.5rem; color: #fff; }
-        .bubble h1:first-child, .bubble h2:first-child, .bubble h3:first-child { margin-top: 0; }
+        .bubble h1, .bubble h2, .bubble h3 { margin: 1.5rem 0 1rem 0; color: #fff; }
         .bubble ul, .bubble ol { margin-left: 1.5rem; margin-bottom: 1rem; }
-        .bubble li { margin-bottom: 0.5rem; }
-        
-        /* Code Blocks */
         .bubble pre { 
             background: #11131c; 
-            padding: 1.25rem; 
+            padding: 1rem; 
             border-radius: 12px; 
             overflow-x: auto; 
-            margin-top: 0.5rem;
-            margin-bottom: 1rem; 
-            border: 1px solid rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            margin: 1rem 0;
         }
         .bubble code { 
-            font-family: 'Courier New', Courier, monospace; 
             background: rgba(255,255,255,0.1); 
             padding: 0.2rem 0.4rem; 
             border-radius: 6px; 
-            font-size: 0.85em;
+            font-size: 0.9em;
+            font-family: monospace;
             color: #818cf8;
         }
-        .bubble pre code {
-            background: transparent;
-            padding: 0;
-            color: #e2e8f0;
-        }
+        .bubble pre code { background: transparent; padding: 0; color: #e2e8f0; }
 
         .label {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             color: var(--text-muted);
             margin-bottom: 0.5rem;
             font-weight: 500;
         }
 
-        /* CENTERED FLOATING INPUT AREA */
+        /* PERFECTLY CENTERED INPUT AREA */
         .input-area {
             position: fixed;
             bottom: 0;
             left: 0;
-            right: 0;
-            padding: 1.5rem;
-            background: linear-gradient(to top, var(--bg-dark) 60%, transparent);
+            width: 100%;
+            padding: 1rem;
+            padding-bottom: max(1rem, env(safe-area-inset-bottom)); /* iPhone notch safe area */
+            background: linear-gradient(to top, var(--bg-dark) 80%, transparent);
             display: flex;
-            justify-content: center;
+            justify-content: center; /* Forces the box to the exact center of the screen */
+            align-items: center;
             z-index: 30;
         }
 
+        /* THE CHATBOX ITSELF */
         .input-wrapper {
             width: 100%;
-            max-width: 800px;
+            max-width: 800px; /* Same max-width as chat history */
             display: flex;
             align-items: flex-end;
-            background: rgba(30, 33, 48, 0.7);
+            background: rgba(30, 33, 48, 0.95);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border-radius: 24px;
+            border-radius: 28px;
             padding: 0.5rem 0.5rem 0.5rem 1.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            transition: border-color 0.3s;
         }
 
         .input-wrapper:focus-within {
-            border-color: rgba(99, 102, 241, 0.5);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(99, 102, 241, 0.1);
+            border-color: var(--accent);
         }
 
         textarea {
@@ -238,77 +207,53 @@
             border: none;
             color: white;
             padding: 0.75rem 0;
-            font-size: 1rem;
+            font-size: 16px; /* 16px prevents mobile keyboard zoom */
             line-height: 1.5;
             outline: none;
             resize: none;
-            height: 50px;
+            height: 48px; /* Fixed starting height */
             max-height: 150px;
         }
 
         textarea::placeholder {
-            color: rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.4);
         }
 
         button {
-            background: var(--text-main);
+            background: #fff;
             color: var(--bg-dark);
             border: none;
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-left: 0.5rem;
-            margin-bottom: 5px;
-            transition: all 0.2s ease;
-        }
-
-        button:hover {
-            transform: scale(1.05);
-            background: #fff;
+            margin-left: 10px;
+            flex-shrink: 0; /* Prevents button from squishing */
         }
 
         button:active {
-            transform: scale(0.95);
+            transform: scale(0.9);
         }
 
-        /* LOADING ANIMATION */
+        /* TYPING INDICATOR */
         .typing-indicator {
             display: none;
             gap: 6px;
             padding: 1rem 0;
-            align-items: center;
         }
-
         .dot {
             width: 6px;
             height: 6px;
             background: var(--accent);
             border-radius: 50%;
-            animation: bounce 1.4s infinite ease-in-out both;
+            animation: bounce 1.4s infinite both;
         }
-
         .dot:nth-child(1) { animation-delay: -0.32s; }
         .dot:nth-child(2) { animation-delay: -0.16s; }
-
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
-        }
-
-        /* MOBILE SPECIFIC TWEAKS */
-        @media (max-width: 768px) {
-            .header { padding: 1rem; }
-            .chat-history { padding: 1rem 1rem 100px 1rem; }
-            .input-area { padding: 1rem; }
-            .input-wrapper { border-radius: 20px; padding: 0.25rem 0.25rem 0.25rem 1rem; }
-            textarea { height: 45px; font-size: 16px; /* 16px prevents iOS zoom */ }
-            button { width: 35px; height: 35px; margin-bottom: 5px; }
-            .bubble { max-width: 90%; }
-        }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
     </style>
 </head>
 <body>
