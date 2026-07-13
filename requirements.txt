@@ -3,6 +3,4 @@ uvicorn
 langchain
 langchain-groq
 langchain-community
-chromadb
-fastembed
 python-dotenv

@@ -41,8 +41,8 @@ rag_system = None
 async def startup_event():
     global rag_system
     try:
-        # Initialize the LangChain RAG pipeline (reads the text file, chunks it, embeds it)
-        rag_system = EnterpriseRAG(data_path="./data/company_policy.txt")
+        # Initialize the AI pipeline (General AI Assistant)
+        rag_system = EnterpriseRAG()
     except Exception as e:
         print(f"FAILED TO START AI ENGINE: {e}")
         # If the OpenAI key is missing, the server will still start, but the engine will be None.
