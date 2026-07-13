@@ -20,17 +20,16 @@ class EnterpriseRAG:
         """
         print("[AI ENGINE] Initializing General AI System with Memory...")
         
-        # 1. INITIALIZE MODELS
-        # We use Groq's lightning fast Llama-3 model
+        # We use Groq's insanely smart Llama-3.3 70B model (Free & incredibly capable)
         groq_api_key = os.environ.get("GROQ_API_KEY")
-        self.llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.2, groq_api_key=groq_api_key)
+        self.llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2, groq_api_key=groq_api_key)
 
         # 2. BUILD THE SYSTEM PROMPT & MEMORY
-        # We set extremely strict rules for conciseness.
+        # We set extremely strict rules for conciseness and typo correction.
         system_prompt = (
             "You are Nexus AI, a highly intelligent and helpful AI assistant. "
-            "CRITICAL INSTRUCTION: You MUST be concise. Answer the user's question directly without unnecessary fluff, long introductions, or over-explaining. "
-            "If the user asks a simple question, give a short, direct answer. "
+            "CRITICAL INSTRUCTION 1: You MUST be concise. Answer the user's question directly without unnecessary fluff, long introductions, or over-explaining. "
+            "CRITICAL INSTRUCTION 2: Be extremely forgiving with typos, spelling mistakes, or bad grammar. If the user misspells a college (like 'gutam' instead of 'gitam'), a city, or any topic, intelligently figure out what they mean and answer the question without complaining that you don't recognize the typo. "
             "Remember previous messages in the conversation to provide accurate context."
         )
         self.chat_history = [SystemMessage(content=system_prompt)]
