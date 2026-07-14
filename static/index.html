@@ -1174,7 +1174,13 @@ async function sendMessage() {
   if (isStreaming) return;
 
   const input = document.getElementById('userInput');
-  const userText = input.value.trim();
+  let userText = input.value.trim();
+  
+  // If no text but file exists, default to asking about the file
+  if (!userText && pendingFileContent) {
+    userText = "Please analyze this file.";
+  }
+  
   if (!userText) return;
 
   // Detect if user wants a PDF output
