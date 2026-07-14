@@ -838,14 +838,22 @@ if (typeof pdfjsLib !== 'undefined') {
 
 // ── Markdown setup ────────────────────────────────────────────
 const renderer = new marked.Renderer();
-renderer.code = function(code, language) {
-  const lang = (language || 'code').toUpperCase();
-  const escapedCode = escapeHtml(code);
+renderer.code = function(tokenOrCode, language) {
+  let codeText = '', langStr = '';
+  if (typeof tokenOrCode === 'object' && tokenOrCode !== null) {
+    codeText = tokenOrCode.text || '';
+    langStr = tokenOrCode.lang || 'code';
+  } else {
+    codeText = tokenOrCode || '';
+    langStr = language || 'code';
+  }
+  const lang = langStr.toUpperCase();
+  const escapedCode = escapeHtml(codeText);
   return `
     <div class="code-block-container">
       <div class="code-header">
         <span class="code-lang">${escapeHtml(lang)}</span>
-        <button class="code-copy-btn" onclick="copyText(this)" data-text="${escapeAttr(code)}" title="Copy code">
+        <button class="code-copy-btn" onclick="copyText(this)" data-text="${escapeAttr(codeText)}" title="Copy code">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copy code
         </button>
