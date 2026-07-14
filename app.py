@@ -1,143 +1,133 @@
-# ==============================================================================
-# app.py - The Main Web API Server (FastAPI)
-# ==============================================================================
-# This is the entry point for our application. 
-# It creates a high-performance HTTP server that allows frontend applications 
-# (like your Angular Enterprise Portal) to send questions to our AI.
-# 
-# To run this server, execute:
-# uvicorn app:app --reload --port 8000
-# ==============================================================================
-
-from fastapi import FastAPI, HTTPException
+import os
+import time
+import traceback
+import uuid
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import traceback
+from typing import Optional
 
-# Import our custom RAG engine from rag_engine.py
 from rag_engine import EnterpriseRAG
 
-# Initialize the FastAPI application
-app = FastAPI(
-    title="Enterprise HR AI Assistant",
-    description="A RAG-powered LLM API for querying internal company documents.",
-    version="1.0.0"
+app = FastAPI(title="Nexus AI", version="2.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Mount the static directory so we can serve our beautiful HTML/CSS/JS frontend UI
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Global variable to hold our AI engine in memory
-rag_system = None
+# ------------------------------------------------------------------
+# SESSION MANAGEMENT
+# Each user/chat gets their own AI engine instance (separate memory).
+# sessions = { session_id: { "engine": EnterpriseRAG, "last_used": timestamp } }
+# ------------------------------------------------------------------
+sessions: dict = {}
+SESSION_TIMEOUT = 1800  # 30 minutes of inactivity → session cleared
 
-# ------------------------------------------------------------------------------
-# LIFECYCLE EVENT: Startup
-# ------------------------------------------------------------------------------
-# This function runs automatically the second you start the server.
-# We use it to initialize our heavy AI models and Vector Database so they 
-# are loaded into RAM once, making all subsequent API calls lightning fast.
+
+def get_or_create_session(session_id: str) -> EnterpriseRAG:
+    """Get existing AI engine for session or create a new one."""
+    now = time.time()
+
+    # Purge expired sessions to prevent memory leak
+    expired = [sid for sid, s in sessions.items() if now - s["last_used"] > SESSION_TIMEOUT]
+    for sid in expired:
+        del sessions[sid]
+
+    if session_id not in sessions:
+        sessions[session_id] = {"engine": EnterpriseRAG(), "last_used": now}
+    else:
+        sessions[session_id]["last_used"] = now
+
+    return sessions[session_id]["engine"]
+
+
+# ------------------------------------------------------------------
+# STARTUP
+# ------------------------------------------------------------------
 @app.on_event("startup")
 async def startup_event():
-    global rag_system
-    try:
-        # Initialize the AI pipeline (General AI Assistant)
-        rag_system = EnterpriseRAG()
-    except Exception as e:
-        print(f"FAILED TO START AI ENGINE: {e}")
-        # If the OpenAI key is missing, the server will still start, but the engine will be None.
+    print("[NEXUS AI] Server starting up...")
+    print(f"[NEXUS AI] GROQ_API_KEY present: {bool(os.environ.get('GROQ_API_KEY'))}")
 
-# ------------------------------------------------------------------------------
-# DATA MODELS (Pydantic)
-# ------------------------------------------------------------------------------
-# Pydantic is used in FastAPI to strict-type incoming JSON requests.
-# If a frontend sends a request without a 'question' string, FastAPI rejects it instantly.
+
+# ------------------------------------------------------------------
+# DATA MODELS
+# ------------------------------------------------------------------
 class ChatRequest(BaseModel):
     question: str
+    session_id: Optional[str] = "default"
 
-# ------------------------------------------------------------------------------
-# API ENDPOINTS
-# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------
+# ROUTES
+# ------------------------------------------------------------------
 
 @app.get("/")
 def serve_frontend():
-    """
-    Serves the beautiful HTML/JS frontend UI when you visit http://localhost:8000
-    """
     return FileResponse("static/index.html")
 
 
-@app.post("/api/chat")
-async def chat_with_hr_bot(request: ChatRequest):
-    """
-    The core API endpoint. 
-    Frontend sends a POST request with JSON: { "question": "How many PTO days do I get?" }
-    """
-    if not rag_system:
-        raise HTTPException(
-            status_code=500, 
-            detail="AI Engine is offline. Check your GROQ_API_KEY in the .env file or Render Environment."
-        )
-    
-    try:
-        # 2. Extract the question from the validated JSON body
-        user_query = request.question
-        
-        # 3. Pass the question to our LangChain pipeline (Asynchronously)
-        # This is where the magic happens: Retrieval from ChromaDB -> Prompt generation -> OpenAI GPT-3.5 response
-        result = await rag_system.ask_question(user_query)
-        
-        # 4. Return the answer and metadata back to the frontend as JSON
-        return {
-            "success": True,
-            "question": user_query,
-            "answer": result["answer"],
-            "sources_consulted": result["sources_used"]
-        }
-        
-    except Exception as e:
-        # If OpenAI's servers go down, or something breaks, catch it and return a clean error to the frontend.
-        print("ERROR IN CHAT ENDPOINT:")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/api/reset")
+async def reset_session(request: ChatRequest):
+    """Clear conversation memory for a given session (New Chat button)."""
+    sid = request.session_id or "default"
+    if sid in sessions:
+        sessions[sid]["engine"].reset()
+    return {"success": True, "message": "Session reset."}
+
+
+@app.get("/api/new_session")
+async def new_session():
+    """Generate a fresh unique session ID for a new conversation."""
+    return {"session_id": str(uuid.uuid4())}
+
+
 @app.get("/api/stream")
-async def stream_chat_with_hr_bot(question: str):
+async def stream_chat(question: str, session_id: str = "default"):
     """
-    Server-Sent Events (SSE) streaming endpoint.
-    This gives the 'instant flash' effect by streaming tokens one by one
-    the millisecond they are generated by the LLM.
+    Server-Sent Events streaming endpoint.
+    Streams AI response token-by-token for instant 'typewriter' effect.
     """
-    if not rag_system:
-        raise HTTPException(
-            status_code=500, 
-            detail="AI Engine is offline."
-        )
+    if not question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    engine = get_or_create_session(session_id)
 
     async def event_generator():
         try:
-            async for chunk in rag_system.astream_question(question):
-                # Gemini sometimes returns content as a list of dicts instead of a string
-                if isinstance(chunk, list):
-                    text_chunk = "".join([c.get("text", "") if isinstance(c, dict) else str(c) for c in chunk])
-                else:
-                    text_chunk = str(chunk)
-
-                # Format as SSE (Server-Sent Events)
+            async for chunk in engine.astream_question(question):
+                text_chunk = str(chunk)
                 safe_chunk = text_chunk.replace('\n', '<br>')
                 yield f"data: {safe_chunk}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
-            print("ERROR IN STREAM ENDPOINT:")
+            print("ERROR IN STREAM:")
             traceback.print_exc()
             yield f"data: [ERROR] {str(e)}\n\n"
 
-    # CRITICAL: When using proxies like VS Code Ports, Ngrok, or LocalTunnel,
-    # they will try to "buffer" the stream (hold onto it until it's finished).
-    # These headers force the proxy to instantly pass the data through to the phone.
     headers = {
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
         "X-Accel-Buffering": "no"
     }
-
     return StreamingResponse(event_generator(), media_type="text/event-stream", headers=headers)
+
+
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
+    """Non-streaming chat endpoint (fallback)."""
+    engine = get_or_create_session(request.session_id or "default")
+    try:
+        result = await engine.ask_question(request.question)
+        return {"success": True, "answer": result["answer"]}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

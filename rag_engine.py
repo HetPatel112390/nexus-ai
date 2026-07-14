@@ -1,71 +1,61 @@
 import os
 from dotenv import load_dotenv
-
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-
-# New Super-Fast Free Models
 from langchain_groq import ChatGroq
 
-# Load environment variables (API keys) from our .env file
 load_dotenv()
 
-# We need an API key to talk to Groq's supercomputers.
 if not os.environ.get("GROQ_API_KEY"):
-    raise ValueError("CRITICAL ERROR: GROQ_API_KEY not found in .env file. Please add it.")
+    raise ValueError("CRITICAL: GROQ_API_KEY not found.")
+
+SYSTEM_PROMPT = (
+    "You are Nexus AI, a highly intelligent and helpful AI assistant — like Gemini or ChatGPT. "
+    "RULE 1 — CONCISENESS: Answer directly. No fluff, no long preambles. Short question = short answer. "
+    "RULE 2 — TYPO TOLERANCE: If the user misspells something (e.g. 'gutam' instead of 'gitam', 'hydrabad' instead of 'hyderabad'), "
+    "intelligently infer the correct meaning and answer without complaining about the typo. "
+    "RULE 3 — CONTEXT MEMORY: Remember everything from this conversation. If the user says 'what about CSE?' after asking about a college, "
+    "you know exactly which college they mean. "
+    "RULE 4 — FILES: If the user shares text extracted from a PDF or file, read it carefully and answer questions about it accurately. "
+    "RULE 5 — FORMAT: Use markdown formatting (bold, lists, tables) when it improves clarity."
+)
+
 
 class EnterpriseRAG:
-    def __init__(self, data_path=None):
-        """
-        Constructor: Initializes the AI model and memory.
-        """
-        print("[AI ENGINE] Initializing General AI System with Memory...")
-        
-        # We use Groq's insanely smart Llama-3.3 70B model (Free & incredibly capable)
+    def __init__(self):
         groq_api_key = os.environ.get("GROQ_API_KEY")
-        self.llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2, groq_api_key=groq_api_key)
-
-        # 2. BUILD THE SYSTEM PROMPT & MEMORY
-        # We set extremely strict rules for conciseness and typo correction.
-        system_prompt = (
-            "You are Nexus AI, a highly intelligent and helpful AI assistant. "
-            "CRITICAL INSTRUCTION 1: You MUST be concise. Answer the user's question directly without unnecessary fluff, long introductions, or over-explaining. "
-            "CRITICAL INSTRUCTION 2: Be extremely forgiving with typos, spelling mistakes, or bad grammar. If the user misspells a college (like 'gutam' instead of 'gitam'), a city, or any topic, intelligently figure out what they mean and answer the question without complaining that you don't recognize the typo. "
-            "Remember previous messages in the conversation to provide accurate context."
+        # llama-3.3-70b-versatile: Massive 70B model, free on Groq, near GPT-4 quality
+        self.llm = ChatGroq(
+            model="llama-3.3-70b-versatile",
+            temperature=0.3,
+            groq_api_key=groq_api_key,
+            max_tokens=2048
         )
-        self.chat_history = [SystemMessage(content=system_prompt)]
-        
-        print("[AI ENGINE] System Ready.")
+        self.reset()
+
+    def reset(self):
+        """Clear conversation memory (called on New Chat)."""
+        self.chat_history = [SystemMessage(content=SYSTEM_PROMPT)]
 
     async def ask_question(self, user_question: str) -> dict:
-        """
-        Public method to query the system asynchronously (Non-streaming).
-        """
+        """Non-streaming question answering."""
         self.chat_history.append(HumanMessage(content=user_question))
-        
         response = await self.llm.ainvoke(self.chat_history)
-        
         self.chat_history.append(AIMessage(content=response.content))
-        
-        # Return the final answer
-        return {
-            "answer": response.content,
-            "sources_used": 0
-        }
+        self._trim_history()
+        return {"answer": response.content, "sources_used": 0}
 
     async def astream_question(self, user_question: str):
-        """
-        Streams the answer token by token and remembers the conversation.
-        """
+        """Streaming question — yields token chunks one by one."""
         self.chat_history.append(HumanMessage(content=user_question))
-        
         full_response = ""
         async for chunk in self.llm.astream(self.chat_history):
             if chunk.content:
                 full_response += chunk.content
                 yield chunk.content
-                
         self.chat_history.append(AIMessage(content=full_response))
-        
-        # Prevent memory from growing infinitely (keep last 20 messages + system prompt)
-        if len(self.chat_history) > 21:
-            self.chat_history = [self.chat_history[0]] + self.chat_history[-20:]
+        self._trim_history()
+
+    def _trim_history(self):
+        """Keep last 30 messages + system prompt to prevent context overflow."""
+        if len(self.chat_history) > 31:
+            self.chat_history = [self.chat_history[0]] + self.chat_history[-30:]
