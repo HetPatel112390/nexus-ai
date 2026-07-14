@@ -462,13 +462,49 @@
     .bubble th, .bubble td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }
     .bubble th { background: var(--surface2); color: var(--text); }
     .bubble td { color: var(--text-muted); }
-    .bubble pre {
+    /* Enhanced Code Blocks */
+    .code-block-container {
       background: #0d0f1a;
       border: 1px solid var(--border);
       border-radius: 12px;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 12px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    .code-lang {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .code-copy-btn {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all var(--transition);
+    }
+    .code-copy-btn:hover {
+      color: var(--text);
+      background: rgba(255,255,255,0.1);
+    }
+    .code-copy-btn svg { width: 12px; height: 12px; }
+    .code-block-container pre {
       padding: 1rem;
       overflow-x: auto;
-      margin: 0.8rem 0;
+      margin: 0;
+      border: none;
+      border-radius: 0;
     }
     .bubble code {
       background: rgba(99,102,241,0.15);
@@ -799,6 +835,26 @@ if (typeof pdfjsLib !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
+
+// ── Markdown setup ────────────────────────────────────────────
+const renderer = new marked.Renderer();
+renderer.code = function(code, language) {
+  const lang = (language || 'code').toUpperCase();
+  const escapedCode = escapeHtml(code);
+  return `
+    <div class="code-block-container">
+      <div class="code-header">
+        <span class="code-lang">${escapeHtml(lang)}</span>
+        <button class="code-copy-btn" onclick="copyText(this)" data-text="${escapeAttr(code)}" title="Copy code">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy code
+        </button>
+      </div>
+      <pre><code>${escapedCode}</code></pre>
+    </div>
+  `;
+};
+marked.use({ renderer });
 
 // ── State ─────────────────────────────────────────────────────
 let currentUser = null;          // { id, name, email, picture }
@@ -1213,18 +1269,13 @@ function finishStream(aiRow, responseText) {
         </button>
         <div class="dl-dropdown" id="">
           <div class="dl-option" onclick="dlChoice(this,'whole')">
-            <span class="dl-icon">📄</span>
-            <div><strong>Whole Response</strong><br><small style="color:var(--text-muted);font-size:0.72rem">Full text as .txt file</small></div>
+            <span class="dl-icon">📕</span>
+            <div><strong>Whole Response</strong><br><small style="color:var(--text-muted);font-size:0.72rem">Full text as PDF</small></div>
           </div>
           <div class="dl-divider"></div>
           <div class="dl-option" onclick="dlChoice(this,'code')">
             <span class="dl-icon">💻</span>
             <div><strong>Code Only</strong><br><small style="color:var(--text-muted);font-size:0.72rem">Extracted code blocks</small></div>
-          </div>
-          <div class="dl-divider"></div>
-          <div class="dl-option" onclick="dlChoice(this,'pdf')">
-            <span class="dl-icon">📕</span>
-            <div><strong>Download as PDF</strong><br><small style="color:var(--text-muted);font-size:0.72rem">Formatted PDF document</small></div>
           </div>
         </div>
       </div>
@@ -1342,8 +1393,8 @@ function smartDownload(e, btn) {
   dropdown.dataset.text = text;
 
   if (!hasCode(text)) {
-    // Plain text — download immediately, no popup
-    saveTxt(text, 'nexus-ai-response');
+    // Plain text — download immediately as PDF
+    generateAndDownloadPdf(text);
     return;
   }
 
@@ -1364,7 +1415,7 @@ function dlChoice(optionEl, choice) {
   closeAllDropdowns();
 
   if (choice === 'whole') {
-    saveTxt(text, 'nexus-ai-response');
+    generateAndDownloadPdf(text);
 
   } else if (choice === 'code') {
     const blocks = extractCodeBlocks(text);
@@ -1384,9 +1435,6 @@ function dlChoice(optionEl, choice) {
                      html:'html', css:'css', bash:'sh', shell:'sh', sql:'sql', json:'json' };
     const fileExt = extMap[ext.toLowerCase()] || ext || 'txt';
     saveTxt(output.trim(), 'code-extract', fileExt);
-
-  } else if (choice === 'pdf') {
-    generateAndDownloadPdf(text);
   }
 }
 
