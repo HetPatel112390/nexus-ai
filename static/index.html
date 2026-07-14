@@ -13,6 +13,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Markdown renderer -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- jsPDF for generating downloadable PDF files -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <!-- PDF.js for client-side PDF parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <!-- Google Identity Services (Sign-In) -->
@@ -383,30 +385,67 @@
       max-width: 100%;
     }
 
-    /* AI message actions row */
+    /* AI message actions row — always visible */
     .msg-actions {
       display: flex;
       gap: 0.4rem;
-      margin-top: 0.6rem;
-      opacity: 0;
-      transition: opacity 0.2s;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+      opacity: 1;
     }
-    .msg-row.ai:hover .msg-actions { opacity: 1; }
 
     .action-btn {
-      padding: 4px 10px;
+      padding: 5px 12px;
       border-radius: 8px;
-      font-size: 0.75rem;
+      font-size: 0.78rem;
       color: var(--text-muted);
       border: 1px solid var(--border);
       background: var(--surface);
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
       transition: all var(--transition);
+      white-space: nowrap;
     }
     .action-btn:hover { color: var(--text); border-color: var(--border-hover); background: var(--surface2); }
-    .action-btn svg { width: 13px; height: 13px; }
+    .action-btn.pdf-btn:hover { color: #f59e0b; border-color: #f59e0b; }
+    .action-btn.dl-btn:hover { color: #34d399; border-color: #34d399; }
+    .action-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+    /* Smart download dropdown */
+    .dl-wrap { position: relative; display: inline-flex; }
+    .dl-dropdown {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border-hover);
+      border-radius: 12px;
+      padding: 6px;
+      min-width: 180px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      z-index: 200;
+      flex-direction: column;
+      gap: 4px;
+      animation: fadeUp 0.15s ease;
+    }
+    .dl-dropdown.open { display: flex; }
+    .dl-option {
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+    .dl-option:hover { background: var(--surface); color: var(--text); }
+    .dl-option .dl-icon { font-size: 1rem; }
+    .dl-divider { height: 1px; background: var(--border); margin: 2px 0; }
 
     /* Markdown styling inside bubbles */
     .bubble p { margin-bottom: 0.8rem; }
@@ -1074,6 +1113,10 @@ async function sendMessage() {
   const userText = input.value.trim();
   if (!userText) return;
 
+  // Detect if user wants a PDF output
+  const pdfKeywords = /\bpdf\b|as a pdf|in pdf|generate pdf|create pdf|download pdf|give.*pdf|export.*pdf/i;
+  window._lastUserAskedForPdf = pdfKeywords.test(userText);
+
   // Build full question (with file context if any)
   let fullQuestion = userText;
   let displayText = userText;
@@ -1159,15 +1202,39 @@ function finishStream(aiRow, responseText) {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'msg-actions';
     actionsDiv.innerHTML = `
-      <button class="action-btn" onclick="copyText(this)" data-text="${escapeAttr(responseText)}">
+      <button class="action-btn" onclick="copyText(this)" data-text="${escapeAttr(responseText)}" title="Copy full response">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         Copy
       </button>
-      <button class="action-btn" onclick="downloadText(this)" data-text="${escapeAttr(responseText)}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download
-      </button>
+      <div class="dl-wrap">
+        <button class="action-btn dl-btn" onclick="smartDownload(event, this)" data-text="${escapeAttr(responseText)}" title="Download">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </button>
+        <div class="dl-dropdown" id="">
+          <div class="dl-option" onclick="dlChoice(this,'whole')">
+            <span class="dl-icon">📄</span>
+            <div><strong>Whole Response</strong><br><small style="color:var(--text-muted);font-size:0.72rem">Full text as .txt file</small></div>
+          </div>
+          <div class="dl-divider"></div>
+          <div class="dl-option" onclick="dlChoice(this,'code')">
+            <span class="dl-icon">💻</span>
+            <div><strong>Code Only</strong><br><small style="color:var(--text-muted);font-size:0.72rem">Extracted code blocks</small></div>
+          </div>
+          <div class="dl-divider"></div>
+          <div class="dl-option" onclick="dlChoice(this,'pdf')">
+            <span class="dl-icon">📕</span>
+            <div><strong>Download as PDF</strong><br><small style="color:var(--text-muted);font-size:0.72rem">Formatted PDF document</small></div>
+          </div>
+        </div>
+      </div>
     `;
+
+    // Auto-generate PDF if user explicitly asked for one
+    if (window._lastUserAskedForPdf) {
+      window._lastUserAskedForPdf = false;
+      setTimeout(() => generateAndDownloadPdf(responseText), 400);
+    }
     aiRow.appendChild(actionsDiv);
 
     // Save to memory
@@ -1230,19 +1297,240 @@ function scrollToBottom() {
 // ── Copy & Download ───────────────────────────────────────────
 function copyText(btn) {
   const text = btn.dataset.text;
-  navigator.clipboard.writeText(text).then(() => toast('✅ Copied to clipboard!'));
+  navigator.clipboard.writeText(text)
+    .then(() => toast('✅ Copied to clipboard!'))
+    .catch(() => {
+      const el = document.createElement('textarea');
+      el.value = text; document.body.appendChild(el);
+      el.select(); document.execCommand('copy');
+      document.body.removeChild(el);
+      toast('✅ Copied!');
+    });
 }
 
-function downloadText(btn) {
+// ── Smart Download ────────────────────────────────────────────
+function extractCodeBlocks(text) {
+  // Extract all fenced code blocks (``` ... ```)
+  const matches = [];
+  const regex = /```([\w]*)?\n?([\s\S]*?)```/g;
+  let m;
+  while ((m = regex.exec(text)) !== null) {
+    const lang = m[1] ? m[1].trim() : '';
+    const code = m[2].trim();
+    if (code) matches.push({ lang, code });
+  }
+  return matches;
+}
+
+function hasCode(text) {
+  return /```[\s\S]*?```/.test(text);
+}
+
+let _activeDropdown = null;
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.dl-dropdown.open').forEach(d => d.classList.remove('open'));
+  _activeDropdown = null;
+}
+
+function smartDownload(e, btn) {
+  e.stopPropagation();
   const text = btn.dataset.text;
-  const fileName = text.split(' ').slice(0, 5).join('_').replace(/[^a-z0-9_]/gi, '') + '.txt';
-  const blob = new Blob([text], { type: 'text/plain' });
+  const dropdown = btn.nextElementSibling; // the .dl-dropdown div
+
+  // Store text on dropdown for dlChoice to read
+  dropdown.dataset.text = text;
+
+  if (!hasCode(text)) {
+    // Plain text — download immediately, no popup
+    saveTxt(text, 'nexus-ai-response');
+    return;
+  }
+
+  // Has code — toggle the dropdown
+  if (dropdown.classList.contains('open')) {
+    dropdown.classList.remove('open');
+    _activeDropdown = null;
+  } else {
+    closeAllDropdowns();
+    dropdown.classList.add('open');
+    _activeDropdown = dropdown;
+  }
+}
+
+function dlChoice(optionEl, choice) {
+  const dropdown = optionEl.closest('.dl-dropdown');
+  const text = dropdown.dataset.text;
+  closeAllDropdowns();
+
+  if (choice === 'whole') {
+    saveTxt(text, 'nexus-ai-response');
+
+  } else if (choice === 'code') {
+    const blocks = extractCodeBlocks(text);
+    if (blocks.length === 0) {
+      toast('⚠ No code blocks found.');
+      return;
+    }
+    // Build a clean file with all code blocks separated
+    let output = '';
+    blocks.forEach((b, i) => {
+      if (blocks.length > 1) output += `// --- Block ${i + 1}${b.lang ? ' (' + b.lang + ')' : ''} ---\n`;
+      output += b.code + '\n\n';
+    });
+    // Use language of first block as file extension if available
+    const ext = blocks[0].lang || 'txt';
+    const extMap = { javascript:'js', python:'py', c:'c', cpp:'cpp', java:'java', typescript:'ts',
+                     html:'html', css:'css', bash:'sh', shell:'sh', sql:'sql', json:'json' };
+    const fileExt = extMap[ext.toLowerCase()] || ext || 'txt';
+    saveTxt(output.trim(), 'code-extract', fileExt);
+
+  } else if (choice === 'pdf') {
+    generateAndDownloadPdf(text);
+  }
+}
+
+function saveTxt(content, baseName, ext = 'txt') {
+  const fileName = (baseName || 'nexus-ai').replace(/[^a-z0-9_-]/gi, '_');
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = fileName || 'nexus-ai-response.txt';
+  a.download = `${fileName}.${ext}`;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('✅ Downloaded!');
+  toast(`✅ Downloaded as .${ext}!`);
+}
+
+function downloadPdf(btn) {
+  generateAndDownloadPdf(btn.dataset.text);
+}
+
+// Close dropdown when clicking anywhere outside
+document.addEventListener('click', (e) => {
+  if (_activeDropdown && !_activeDropdown.contains(e.target)) {
+    closeAllDropdowns();
+  }
+});
+
+function stripMarkdown(md) {
+  return md
+    .replace(/#{1,6}\s+/g, '')          // headings
+    .replace(/\*\*(.+?)\*\*/g, '$1')    // bold
+    .replace(/\*(.+?)\*/g, '$1')        // italic
+    .replace(/`{1,3}([^`]+)`{1,3}/g, '$1') // code
+    .replace(/^[-*+]\s+/gm, '• ')      // bullets
+    .replace(/^\d+\.\s+/gm, '')        // numbered lists
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
+    .replace(/^>\s+/gm, '')            // blockquotes
+    .replace(/\|/g, '  ')              // table pipes
+    .replace(/^[-|:]+$/gm, '')         // table separators
+    .replace(/\n{3,}/g, '\n\n')        // extra blank lines
+    .trim();
+}
+
+function generateAndDownloadPdf(markdownText) {
+  if (typeof window.jspdf === 'undefined') {
+    toast('⚠ PDF library not loaded. Try again.');
+    return;
+  }
+
+  toast('Generating PDF...');
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+  const pageW   = doc.internal.pageSize.getWidth();
+  const pageH   = doc.internal.pageSize.getHeight();
+  const margin  = 18;
+  const maxW    = pageW - margin * 2;
+  let y         = margin;
+
+  // Header bar
+  doc.setFillColor(30, 33, 53);
+  doc.rect(0, 0, pageW, 18, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('NEXUS AI', margin, 12);
+
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(8);
+  doc.text(new Date().toLocaleString(), pageW - margin, 12, { align: 'right' });
+
+  y = 26;
+
+  // Process markdown line by line for basic formatting
+  const lines = markdownText.split('\n');
+
+  function addText(text, fontSize, fontStyle, textColor, extraSpacing = 0) {
+    doc.setFontSize(fontSize);
+    doc.setFont('helvetica', fontStyle);
+    doc.setTextColor(...textColor);
+    const wrapped = doc.splitTextToSize(text, maxW);
+    wrapped.forEach(line => {
+      if (y + fontSize * 0.4 > pageH - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += fontSize * 0.45 + 1;
+    });
+    y += extraSpacing;
+  }
+
+  lines.forEach(line => {
+    const h1 = line.match(/^#\s+(.+)/);
+    const h2 = line.match(/^##\s+(.+)/);
+    const h3 = line.match(/^###\s+(.+)/);
+    const bullet = line.match(/^[-*+]\s+(.+)/);
+    const numbered = line.match(/^\d+\.\s+(.+)/);
+    const codeBlock = line.startsWith('```');
+    const blockquote = line.match(/^>\s*(.+)/);
+    const divider = line.match(/^[-=]{3,}$/);
+
+    if (codeBlock) return; // skip code fence markers
+    if (!line.trim()) { y += 3; return; } // blank line
+
+    if (h1) {
+      addText(h1[1], 16, 'bold', [99, 102, 241], 3);
+    } else if (h2) {
+      addText(h2[1], 13, 'bold', [99, 102, 241], 2);
+    } else if (h3) {
+      addText(h3[1], 11, 'bold', [148, 163, 184], 1);
+    } else if (bullet || numbered) {
+      const content = (bullet ? bullet[1] : numbered[1]).replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1');
+      addText('• ' + content, 10, 'normal', [226, 232, 240]);
+    } else if (blockquote) {
+      // Draw a left border
+      doc.setDrawColor(99, 102, 241);
+      doc.setLineWidth(0.8);
+      doc.line(margin, y - 3, margin, y + 4);
+      addText(blockquote[1], 10, 'italic', [148, 163, 184]);
+    } else if (divider) {
+      doc.setDrawColor(50, 60, 80);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, pageW - margin, y);
+      y += 4;
+    } else {
+      // Regular text — strip inline markdown
+      const plain = line.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+      addText(plain, 10, 'normal', [226, 232, 240]);
+    }
+  });
+
+  // Footer on each page
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Generated by Nexus AI', margin, pageH - 8);
+    doc.text(`Page ${i} of ${totalPages}`, pageW - margin, pageH - 8, { align: 'right' });
+  }
+
+  const safeTitle = markdownText.split(' ').slice(0, 4).join('_').replace(/[^a-z0-9_]/gi, '') || 'nexus-ai';
+  doc.save(safeTitle + '.pdf');
+  toast('✅ PDF downloaded!');
 }
 
 // ── Escape helpers ─────────────────────────────────────────────
