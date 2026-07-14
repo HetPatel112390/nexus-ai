@@ -1216,18 +1216,27 @@ async function sendMessage() {
   const bubble = aiRow.querySelector('.bubble');
 
   try {
-    const url = `/api/stream?question=${encodeURIComponent(fullQuestion)}&session_id=${encodeURIComponent(currentSessionId)}`;
-    const source = new EventSource(url);
+    const response = await fetch('/api/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: fullQuestion, session_id: currentSessionId })
+    });
 
-    source.onmessage = (event) => {
-      if (event.data === '[DONE]') {
-        source.close();
-        finishStream(aiRow, fullResponse);
-        return;
-      }
-      if (event.data.startsWith('[ERROR]')) {
-        source.close();
-        bubble.innerHTML = `<span style="color:var(--red)">⚠ ${escapeHtml(event.data.replace('[ERROR]', '').trim())}</span>`;
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      
+      if (chunk.includes('[ERROR]')) {
+        bubble.innerHTML = `<span style="color:var(--red)">⚠ ${escapeHtml(chunk.replace('[ERROR]', '').trim())}</span>`;
         finishStream(aiRow, null);
         return;
       }
@@ -1237,19 +1246,12 @@ async function sendMessage() {
         isFirstToken = false;
       }
 
-      const token = event.data.replace(/<br>/g, '\n');
-      fullResponse += token;
+      fullResponse += chunk;
       bubble.innerHTML = marked.parse(fullResponse);
       scrollToBottom();
-    };
-
-    source.onerror = () => {
-      source.close();
-      if (isFirstToken) {
-        bubble.innerHTML = `<span style="color:var(--red)">⚠ Connection error. Please try again.</span>`;
-      }
-      finishStream(aiRow, fullResponse || null);
-    };
+    }
+    
+    finishStream(aiRow, fullResponse);
 
   } catch (err) {
     bubble.innerHTML = `<span style="color:var(--red)">⚠ ${escapeHtml(err.message)}</span>`;

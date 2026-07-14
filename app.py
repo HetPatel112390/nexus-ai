@@ -90,35 +90,32 @@ async def new_session():
     return {"session_id": str(uuid.uuid4())}
 
 
-@app.get("/api/stream")
-async def stream_chat(question: str, session_id: str = "default"):
+@app.post("/api/stream")
+async def stream_chat(request: ChatRequest):
     """
-    Server-Sent Events streaming endpoint.
-    Streams AI response token-by-token for instant 'typewriter' effect.
+    Streaming endpoint using POST to allow large file contents.
+    Streams AI response token-by-token.
     """
-    if not question.strip():
+    if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-    engine = get_or_create_session(session_id)
+    engine = get_or_create_session(request.session_id or "default")
 
     async def event_generator():
         try:
-            async for chunk in engine.astream_question(question):
-                text_chunk = str(chunk)
-                safe_chunk = text_chunk.replace('\n', '<br>')
-                yield f"data: {safe_chunk}\n\n"
-            yield "data: [DONE]\n\n"
+            async for chunk in engine.astream_question(request.question):
+                yield str(chunk)
         except Exception as e:
             print("ERROR IN STREAM:")
             traceback.print_exc()
-            yield f"data: [ERROR] {str(e)}\n\n"
+            yield f"\n\n[ERROR] {str(e)}"
 
     headers = {
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
         "X-Accel-Buffering": "no"
     }
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers=headers)
+    return StreamingResponse(event_generator(), media_type="text/plain", headers=headers)
 
 
 @app.post("/api/chat")
